@@ -147,7 +147,7 @@ tasks {
         val tokens = mapOf(
                 "project.version" to ProjectVersions.rlVersion,
                 "rs.version" to ProjectVersions.rsversion.toString(),
-                "open.osrs.version" to ProjectVersions.openosrsVersion,
+                "open.osrs.version" to ProjectVersions.unethicaliteVersion,
                 "open.osrs.builddate" to formatDate(Date()),
                 "plugin.path" to pluginPath()
         )
@@ -162,7 +162,7 @@ tasks {
 
     jar {
         manifest {
-            attributes(mutableMapOf("Main-Class" to Unethicalite.getMainClass()))
+            attributes(mutableMapOf("Main-Class" to "net.unethicalite.client.Unethicalite"))
         }
     }
 
@@ -200,6 +200,6 @@ tasks {
 
         classpath = project.sourceSets.main.get().runtimeClasspath
         enableAssertions = true
-        mainClass.set(Unethicalite.getMainClass())
+        mainClass.set("net.unethicalite.client.Unethicalite")
     }
 }
