@@ -33,37 +33,6 @@ import com.google.inject.Injector;
 import com.openosrs.client.OpenOSRS;
 import com.openosrs.client.game.PlayerManager;
 import com.openosrs.client.ui.OpenOSRSSplashScreen;
-import com.thatgamerblue.snake.SnakeGame;
-import java.applet.Applet;
-import java.io.File;
-import java.io.IOException;
-import java.lang.management.ManagementFactory;
-import java.lang.management.RuntimeMXBean;
-import java.net.Authenticator;
-import java.net.PasswordAuthentication;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import static java.nio.file.StandardCopyOption.COPY_ATTRIBUTES;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
-import java.util.Arrays;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
-import javax.annotation.Nullable;
-import javax.inject.Provider;
-import javax.inject.Singleton;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
-import javax.swing.SwingUtilities;
-
-import net.unethicalite.client.minimal.MinimalClient;
 import joptsimple.ArgumentAcceptingOptionSpec;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -74,7 +43,6 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.Constants;
-import net.runelite.client.account.SessionManager;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.discord.DiscordService;
 import net.runelite.client.eventbus.EventBus;
@@ -95,11 +63,42 @@ import net.runelite.client.util.WorldUtil;
 import net.runelite.http.api.RuneLiteAPI;
 import net.runelite.http.api.worlds.World;
 import net.runelite.http.api.worlds.WorldResult;
+import net.unethicalite.client.minimal.MinimalClient;
 import okhttp3.Cache;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Nullable;
+import javax.inject.Provider;
+import javax.inject.Singleton;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import javax.swing.SwingUtilities;
+import java.applet.Applet;
+import java.io.File;
+import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.lang.management.RuntimeMXBean;
+import java.net.Authenticator;
+import java.net.PasswordAuthentication;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
+
+import static java.nio.file.StandardCopyOption.COPY_ATTRIBUTES;
 
 @Singleton
 @Slf4j
@@ -118,7 +117,7 @@ public class RuneLite
 	private static final int MAX_OKHTTP_CACHE_SIZE = 20 * 1024 * 1024; // 20mb
 	public static String USER_AGENT = "RuneLite/" + RuneLiteProperties.getVersion() + "-" + RuneLiteProperties.getCommit() + (RuneLiteProperties.isDirty() ? "+" : "");
 
-	@Getter @lombok.Setter
+	@Getter
 	private static Injector injector;
 
 	@Inject
@@ -135,9 +134,6 @@ public class RuneLite
 
 	@Inject
 	private ConfigManager configManager;
-
-	@Inject
-	private SessionManager sessionManager;
 
 	@Inject
 	private DiscordService discordService;
@@ -181,11 +177,6 @@ public class RuneLite
 	private static final String BYPASS_ARG = "--IWillNotComplainIfIGetSentToTheGulagByJamflex";
 
 	public static void main(String[] args) throws Exception
-	{
-		SnakeGame.main(args);
-	}
-
-	public static void oldMain(String[] args) throws Exception
 	{
 		args = Arrays.stream(args).filter(s -> !BYPASS_ARG.equals(s)).toArray(String[]::new);
 		Locale.setDefault(Locale.ENGLISH);
@@ -392,9 +383,6 @@ public class RuneLite
 		// Load user configuration
 		configManager.load();
 
-		// Load the session, including saved configuration
-		sessionManager.loadSession();
-
 		// Tell the plugin manager if client is outdated or not
 		pluginManager.setOutdated(isOutdated);
 
@@ -558,6 +546,22 @@ public class RuneLite
 			.addInterceptor(chain ->
 			{
 				Request request = chain.request();
+
+				if (request.url().host().endsWith("runescape.com"))
+				{
+					return chain.proceed(request);
+				}
+
+				if (request.url().host().endsWith("openosrs.dev"))
+				{
+					Request userAgentRequest = request
+							.newBuilder()
+							.header("User-Agent", "OpenOSRS/" + OpenOSRS.SYSTEM_VERSION)
+							.build();
+
+					return chain.proceed(userAgentRequest);
+				}
+
 				if (request.header("User-Agent") != null)
 				{
 					return chain.proceed(request);

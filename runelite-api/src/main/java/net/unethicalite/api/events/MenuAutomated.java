@@ -1,12 +1,14 @@
 package net.unethicalite.api.events;
 
-import net.unethicalite.api.SceneEntity;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 import net.runelite.api.Client;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
+import net.runelite.api.widgets.Widget;
+import net.runelite.api.widgets.WidgetInfo;
+import net.unethicalite.api.SceneEntity;
 
 import java.util.function.Consumer;
 
@@ -89,17 +91,22 @@ public class MenuAutomated
 		);
 	}
 
-	public MenuAutomated setItemId(int itemId)
+	public int getItemId(Client client)
 	{
-		setTarget("ItemId=" + itemId);
-		return this;
-	}
-
-	public int getItemId()
-	{
-		if (target.matches("ItemId=\\D+"))
+		MenuAction menuAction = getOpcode();
+		if (menuAction == MenuAction.CC_OP || menuAction == MenuAction.CC_OP_LOW_PRIORITY)
 		{
-			return Integer.parseInt(target.replace("ItemId=", ""));
+			int param1 = this.getParam1();
+			int param0 = this.getParam0();
+			if (param1 == WidgetInfo.INVENTORY.getId())
+			{
+				Widget widget = client.getWidget(param1);
+				if (widget != null && param0 != -1)
+				{
+					widget = widget.getChild(param0);
+					return widget.getItemId();
+				}
+			}
 		}
 
 		return -1;

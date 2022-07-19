@@ -32,6 +32,7 @@ import net.runelite.api.Tile;
  * An event where a {@link GameObject} on a {@link Tile} has been replaced.
  */
 @Data
+@Deprecated(forRemoval = true)
 public class GameObjectChanged
 {
 	/**

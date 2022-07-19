@@ -32,6 +32,7 @@ import net.runelite.api.WallObject;
  * An event where the {@link WallObject} of a {@link Tile} has been changed.
  */
 @Data
+@Deprecated(forRemoval = true)
 public class WallObjectChanged
 {
 	/**

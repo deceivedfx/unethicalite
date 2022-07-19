@@ -1,6 +1,5 @@
 package net.unethicalite.api;
 
-import net.runelite.api.Item;
 import net.runelite.api.MenuAction;
 import net.runelite.api.Point;
 import net.unethicalite.api.commons.Predicates;
@@ -109,11 +108,6 @@ public interface Interactable
 			Point clickPoint = getClickPoint();
 			builder.clickX(clickPoint.getX())
 					.clickY(clickPoint.getY());
-
-			if (this instanceof Item)
-			{
-				return builder.build().setItemId(((Item) this).getId());
-			}
 		}
 
 		return builder.build();

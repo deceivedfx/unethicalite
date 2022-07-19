@@ -32,6 +32,7 @@ import net.runelite.api.Tile;
  * An event where the {@link GroundObject} on a {@link Tile} has been changed.
  */
 @Data
+@Deprecated(forRemoval = true)
 public class GroundObjectChanged
 {
 	/**

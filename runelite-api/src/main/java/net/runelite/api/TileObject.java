@@ -24,13 +24,13 @@
  */
 package net.runelite.api;
 
+import net.runelite.api.coords.LocalPoint;
+import net.unethicalite.api.SceneEntity;
+
+import javax.annotation.Nullable;
 import java.awt.Graphics2D;
 import java.awt.Polygon;
 import java.awt.Shape;
-import javax.annotation.Nullable;
-
-import net.unethicalite.api.SceneEntity;
-import net.runelite.api.coords.LocalPoint;
 
 /**
  * Represents an object on a Tile
@@ -74,6 +74,7 @@ public interface TileObject extends SceneEntity
 	/**
 	 * Calculates the position of the center of this tile on the canvas
 	 */
+	@Nullable
 	Point getCanvasLocation();
 
 	/**
@@ -81,11 +82,13 @@ public interface TileObject extends SceneEntity
 	 *
 	 * @param zOffset Vertical offset to apply before projection
 	 */
+	@Nullable
 	Point getCanvasLocation(int zOffset);
 
 	/**
 	 * Creates a polygon outlining the tile this object is on
 	 */
+	@Nullable
 	Polygon getCanvasTilePoly();
 
 	/**
@@ -95,6 +98,7 @@ public interface TileObject extends SceneEntity
 	 * @param zOffset Vertical offset to apply before projection
 	 * @return the canvas point to draw the text at
 	 */
+	@Nullable
 	Point getCanvasTextLocation(Graphics2D graphics, String text, int zOffset);
 
 	/**
@@ -103,6 +107,7 @@ public interface TileObject extends SceneEntity
 	 *
 	 * @return mini-map location on canvas
 	 */
+	@Nullable
 	Point getMinimapLocation();
 
 	/**
@@ -126,4 +131,6 @@ public interface TileObject extends SceneEntity
 	ObjectComposition getTransformedComposition();
 
 	void setTransformedComposition(ObjectComposition composition);
+
+	int getActualId();
 }

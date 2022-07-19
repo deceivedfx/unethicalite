@@ -32,6 +32,7 @@ import net.runelite.api.Tile;
  * An event where the {@link DecorativeObject} attached to a {@link Tile}
  * has been modified.
  */
+@Deprecated(forRemoval = true)
 @Data
 public class DecorativeObjectChanged
 {
