@@ -46,7 +46,6 @@ import net.runelite.client.RuntimeConfigLoader;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.game.WorldService;
-import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.rs.ClientLoader;
 import net.runelite.client.rs.ClientUpdateCheckMode;
 import net.runelite.client.ui.DrawManager;
@@ -54,13 +53,11 @@ import net.runelite.client.ui.FatalErrorDialog;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.ui.overlay.tooltip.TooltipOverlay;
 import net.runelite.http.api.RuneLiteAPI;
-import net.unethicalite.api.account.GameAccount;
-import net.unethicalite.api.game.Game;
-import net.unethicalite.client.Static;
+import net.unethicalite.client.Unethicalite;
 import net.unethicalite.client.config.UnethicaliteConfig;
 import net.unethicalite.client.managers.MinimalFpsManager;
 import net.unethicalite.client.managers.MinimalPluginManager;
-import net.unethicalite.client.minimal.plugins.PluginEntry;
+import net.unethicalite.client.managers.SettingsManager;
 import net.unethicalite.client.minimal.ui.MinimalToolbar;
 import net.unethicalite.client.minimal.ui.MinimalUI;
 import okhttp3.Cache;
@@ -91,20 +88,17 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.util.Locale;
-import java.util.Objects;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import static java.nio.file.StandardCopyOption.COPY_ATTRIBUTES;
-import static net.runelite.client.RuneLite.OPENOSRS;
 import static net.runelite.client.RuneLite.USER_AGENT;
 
 @Singleton
 @Slf4j
 public class MinimalClient
 {
-	public static final File CLIENT_DIR = new File(System.getProperty("user.home"), ".openosrs");
+	public static final File CLIENT_DIR = Unethicalite.CLIENT_DIR;
 	public static final File CACHE_DIR = new File(CLIENT_DIR, "cache");
 	public static final File LOGS_DIR = new File(CLIENT_DIR, "logs");
 	public static final File DEFAULT_CONFIG_FILE = new File(CLIENT_DIR, "settings.properties");
@@ -113,47 +107,47 @@ public class MinimalClient
 
 	private static final int MAX_OKHTTP_CACHE_SIZE = 20 * 1024 * 1024; // 20mb
 
+	static
+	{
+		//Fixes win10 scaling when not 100% while using Anti-Aliasing with GPU
+		System.setProperty("sun.java2d.uiScale", "1.0");
+
+		String launcherVersion = System.getProperty("launcher.version");
+		System.setProperty("runelite.launcher.version", launcherVersion == null ? "unknown" : launcherVersion);
+
+		CLIENT_DIR.mkdirs();
+		SCRIPTS_DIR.mkdirs();
+		DATA_DIR.mkdirs();
+	}
+
 	@Inject
 	private EventBus eventBus;
-
 	@Inject
 	private ConfigManager configManager;
-
 	@Inject
 	private MinimalUI minimalUI;
-
 	@Inject
 	private OverlayManager overlayManager;
-
 	@Inject
 	private Provider<TooltipOverlay> tooltipOverlay;
-
 	@Inject
 	@Nullable
 	private Client client;
-
 	@Inject
 	private MinimalToolbar minimalToolbar;
-
 	@Inject
 	@Nullable
 	private Applet applet;
-
 	@Inject
 	private MinimalPluginManager minimalPluginManager;
-
 	@Inject
 	private DrawManager drawManager;
-
 	@Inject
 	private MinimalFpsManager minimalFpsManager;
-
 	@Inject
 	private UnethicaliteConfig minimalConfig;
-
 	@Inject
 	private WorldService worldService;
-
 	@Inject
 	private ClientSessionManager clientSessionManager;
 
@@ -182,7 +176,7 @@ public class MinimalClient
 				.withValuesConvertedBy(new ConfigFileConverter())
 				.defaultsTo(DEFAULT_CONFIG_FILE);
 
-		OptionSet options = parseArgs(parser, args);
+		OptionSet options = SettingsManager.parseArgs(parser, args);
 
 		if (options.has("debug"))
 		{
@@ -265,7 +259,8 @@ public class MinimalClient
 					options.has("developer-mode"),
 					okHttpClient,
 					clientLoader,
-					options.valueOf(configfile))));
+					options.valueOf(configfile),
+					options)));
 
 			RuneLite.getInjector().getInstance(MinimalClient.class).start(options);
 
@@ -280,109 +275,6 @@ public class MinimalClient
 			SwingUtilities.invokeLater(() ->
 					new FatalErrorDialog("OpenOSRS has encountered an unexpected error during startup.")
 							.open());
-		}
-	}
-
-	public void start(OptionSet options) throws Exception
-	{
-		// Load RuneLite or Vanilla client
-		final boolean isOutdated = client == null;
-
-		if (!isOutdated)
-		{
-			// Inject members into client
-			RuneLite.getInjector().injectMembers(client);
-		}
-
-		// Start the applet
-		if (applet != null)
-		{
-			copyJagexCache();
-
-			// Client size must be set prior to init
-			applet.setSize(Constants.GAME_FIXED_SIZE);
-
-			// Change user.home so the client places jagexcache in the .runelite directory
-			String oldHome = System.setProperty("user.home", getCacheDirectory().getAbsolutePath());
-			try
-			{
-				applet.init();
-			}
-			finally
-			{
-				System.setProperty("user.home", oldHome);
-			}
-
-			applet.start();
-		}
-
-		// Load user configuration
-		configManager.load();
-
-		minimalToolbar.init();
-		drawManager.registerEveryFrameListener(minimalFpsManager);
-		minimalFpsManager.reloadConfig(minimalConfig.fpsLimit());
-		eventBus.register(minimalToolbar);
-		eventBus.register(minimalPluginManager);
-
-		initArgs(options);
-
-		// Start client session
-		clientSessionManager.start();
-		eventBus.register(clientSessionManager);
-
-		minimalUI.init();
-
-		eventBus.register(minimalUI);
-		eventBus.register(overlayManager);
-		eventBus.register(configManager);
-
-		overlayManager.add(tooltipOverlay.get());
-
-		minimalUI.show();
-
-		if (options.has("script"))
-		{
-			quickLaunch(options);
-		}
-	}
-
-	private static class ConfigFileConverter implements ValueConverter<File>
-	{
-		@Override
-		public File convert(String fileName)
-		{
-			final File file;
-
-			if (Paths.get(fileName).isAbsolute()
-					|| fileName.startsWith("./")
-					|| fileName.startsWith(".\\"))
-			{
-				file = new File(fileName);
-			}
-			else
-			{
-				file = new File(MinimalClient.CLIENT_DIR, fileName);
-			}
-
-			if (file.exists() && (!file.isFile() || !file.canWrite()))
-			{
-				throw new ValueConversionException(String.format("File %s is not accessible", file.getAbsolutePath()));
-			}
-
-			return file;
-		}
-
-		@Override
-		public Class<? extends File> valueType()
-		{
-			return File.class;
-		}
-
-		@Override
-		public String valuePattern()
-		{
-			return null;
 		}
 	}
 
@@ -456,23 +348,10 @@ public class MinimalClient
 		}
 	}
 
-	static
-	{
-		//Fixes win10 scaling when not 100% while using Anti-Aliasing with GPU
-		System.setProperty("sun.java2d.uiScale", "1.0");
-
-		String launcherVersion = System.getProperty("launcher.version");
-		System.setProperty("runelite.launcher.version", launcherVersion == null ? "unknown" : launcherVersion);
-
-		CLIENT_DIR.mkdirs();
-		SCRIPTS_DIR.mkdirs();
-		DATA_DIR.mkdirs();
-	}
-
 	private static void copyJagexCache()
 	{
 		Path from = Paths.get(System.getProperty("user.home"), "jagexcache");
-		Path to = Paths.get(getCacheDirectory().getAbsolutePath(), "jagexcache");
+		Path to = Paths.get(Unethicalite.getCacheDirectory().getAbsolutePath(), "jagexcache");
 		if (Files.exists(to) || !Files.exists(from))
 		{
 			return;
@@ -501,116 +380,104 @@ public class MinimalClient
 		}
 	}
 
-	private void initArgs(OptionSet options)
+	public void start(OptionSet options) throws Exception
 	{
-		if (options.has("norender"))
-		{
-			configManager.setConfiguration("unethicalite", "renderOff", true);
-		}
-	}
+		// Load RuneLite or Vanilla client
+		final boolean isOutdated = client == null;
 
-	private void quickLaunch(OptionSet options)
-	{
+		if (!isOutdated)
+		{
+			// Inject members into client
+			RuneLite.getInjector().injectMembers(client);
+		}
+
+		// Start the applet
+		if (applet != null)
+		{
+			copyJagexCache();
+
+			// Client size must be set prior to init
+			applet.setSize(Constants.GAME_FIXED_SIZE);
+
+			// Change user.home so the client places jagexcache in the .runelite directory
+			String oldHome = System.setProperty("user.home", Unethicalite.getCacheDirectory().getAbsolutePath());
+			try
+			{
+				applet.init();
+			}
+			finally
+			{
+				System.setProperty("user.home", oldHome);
+			}
+
+			applet.start();
+		}
+
+		// Load user configuration
+		configManager.load();
+
+		minimalToolbar.init();
+		drawManager.registerEveryFrameListener(minimalFpsManager);
+		minimalFpsManager.reloadConfig(minimalConfig.fpsLimit());
+		eventBus.register(minimalToolbar);
+		eventBus.register(minimalPluginManager);
+
+		// Start client session
+		clientSessionManager.start();
+		eventBus.register(clientSessionManager);
+
+		minimalUI.init();
+
+		eventBus.register(minimalUI);
+		eventBus.register(overlayManager);
+		eventBus.register(configManager);
+
+		overlayManager.add(tooltipOverlay.get());
+
+		minimalUI.show();
+
 		if (options.has("script"))
 		{
-			String script = (String) options.valueOf("script");
-
-			PluginEntry quickStartScript = minimalPluginManager.loadPlugins()
-					.stream().filter(x -> x.getScriptClass().getAnnotation(PluginDescriptor.class).name().equals(script))
-					.findFirst()
-					.orElse(null);
-			if (quickStartScript == null || !quickStartScript.isScript())
-			{
-				return;
-			}
-
-			minimalPluginManager.startPlugin(quickStartScript);
+			SettingsManager.quickLaunch(minimalPluginManager, options);
 		}
 	}
 
-	private static String getCacheDir()
+	private static class ConfigFileConverter implements ValueConverter<File>
 	{
-		var dir = System.getProperty("unethicalite.cache-dir");
-		if (dir != null)
+		@Override
+		public File convert(String fileName)
 		{
-			return dir;
-		}
+			final File file;
 
-		return OPENOSRS;
-	}
-
-	public static File getCacheDirectory()
-	{
-		var dir = getCacheDir();
-		if (Objects.equals(dir, OPENOSRS))
-		{
-			return new File(CLIENT_DIR, "jagexcache");
-		}
-
-		var cacheDirs = new File(CLIENT_DIR, "custom-cache");
-		return new File(cacheDirs, dir);
-	}
-
-	public static OptionSet parseArgs(OptionParser parser, String... args)
-	{
-		var accInfo = parser
-				.accepts("account")
-				.withRequiredArg().ofType(String.class);
-
-		var cacheDirInfo = parser
-				.accepts("cache-dir")
-				.withOptionalArg().ofType(String.class);
-
-		parser.accepts("minimal");
-		parser.accepts("norender");
-
-		parser.accepts("script")
-				.withRequiredArg().ofType(String.class);
-
-		parser.accepts("scriptArgs")
-				.withRequiredArg().ofType(String.class);
-
-		var options = parser.parse(args);
-
-		if (options.has("account"))
-		{
-			var details = options.valueOf(accInfo).split(":");
-			GameAccount gameAccount = new GameAccount(details[0], details[1]);
-			if (details.length >= 3)
+			if (Paths.get(fileName).isAbsolute()
+					|| fileName.startsWith("./")
+					|| fileName.startsWith(".\\"))
 			{
-				gameAccount.setAuth(details[2]);
-			}
-
-			Game.setGameAccount(gameAccount);
-		}
-
-		if (options.has("scriptArgs"))
-		{
-			Static.setScriptArgs(((String) options.valueOf("scriptArgs")).split(","));
-		}
-
-		if (options.has("cache-dir"))
-		{
-			var cacheDir = options.valueOf(cacheDirInfo);
-
-			if (cacheDir != null)
-			{
-				System.setProperty("unethicalite.cache-dir", cacheDir);
+				file = new File(fileName);
 			}
 			else
 			{
-				var acc = Game.getGameAccount();
-				if (acc != null)
-				{
-					System.setProperty("unethicalite.cache-dir", acc.getUsername());
-				}
-				else
-				{
-					System.setProperty("unethicalite.cache-dir", UUID.randomUUID().toString());
-				}
+				file = new File(MinimalClient.CLIENT_DIR, fileName);
 			}
+
+			if (file.exists() && (!file.isFile() || !file.canWrite()))
+			{
+				throw new ValueConversionException(String.format("File %s is not accessible", file.getAbsolutePath()));
+			}
+
+			return file;
 		}
 
-		return options;
+		@Override
+		public Class<? extends File> valueType()
+		{
+			return File.class;
+		}
+
+		@Override
+		public String valuePattern()
+		{
+			return null;
+		}
 	}
 }

@@ -60,6 +60,7 @@ import org.lwjgl.opengl.GL43C;
 import org.lwjgl.opengl.GLCapabilities;
 import org.lwjgl.opengl.GLUtil;
 import org.lwjgl.system.Callback;
+import org.lwjgl.system.Configuration;
 
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
@@ -150,7 +151,7 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 			.add(GL43C.GL_COMPUTE_SHADER, "comp.glsl");
 
 	static final Shader SMALL_COMPUTE_PROGRAM = new Shader()
-			.add(GL43C.GL_COMPUTE_SHADER, "comp_small.glsl");
+			.add(GL43C.GL_COMPUTE_SHADER, "comp.glsl");
 
 	static final Shader UNORDERED_COMPUTE_PROGRAM = new Shader()
 			.add(GL43C.GL_COMPUTE_SHADER, "comp_unordered.glsl");
@@ -303,6 +304,10 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 				computeMode = config.useComputeShaders()
 						? (OSType.getOSType() == OSType.MacOS ? ComputeMode.OPENCL : ComputeMode.OPENGL)
 						: ComputeMode.NONE;
+
+				// lwjgl defaults to lwjgl- + user.name, but this breaks if the username would cause an invalid path
+				// to be created, and also breaks if both 32 and 64 bit lwjgl versions try to run at once.
+				Configuration.SHARED_LIBRARY_EXTRACT_DIRECTORY.set("lwjgl-rl-" + System.getProperty("os.arch", "unknown"));
 
 				GL.createCapabilities();
 
@@ -521,7 +526,7 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 		checkGLErrors();
 	}
 
-	private void initProgram() throws ShaderException
+	private Template createTemplate(int threadCount, int facesPerThread)
 	{
 		String versionHeader = OSType.getOSType() == OSType.Linux ? LINUX_VERSION_HEADER : WINDOWS_VERSION_HEADER;
 		Template template = new Template();
@@ -531,17 +536,27 @@ public class GpuPlugin extends Plugin implements DrawCallbacks
 			{
 				return versionHeader;
 			}
+			if ("thread_config".equals(key))
+			{
+				return "#define THREAD_COUNT " + threadCount + "\n" +
+						"#define FACES_PER_THREAD " + facesPerThread + "\n";
+			}
 			return null;
 		});
 		template.addInclude(GpuPlugin.class);
+		return template;
+	}
 
+	private void initProgram() throws ShaderException
+	{
+		Template template = createTemplate(-1, -1);
 		glProgram = PROGRAM.compile(template);
 		glUiProgram = UI_PROGRAM.compile(template);
 
 		if (computeMode == ComputeMode.OPENGL)
 		{
-			glComputeProgram = COMPUTE_PROGRAM.compile(template);
-			glSmallComputeProgram = SMALL_COMPUTE_PROGRAM.compile(template);
+			glComputeProgram = COMPUTE_PROGRAM.compile(createTemplate(1024, 4));
+			glSmallComputeProgram = SMALL_COMPUTE_PROGRAM.compile(createTemplate(512, 1));
 			glUnorderedComputeProgram = UNORDERED_COMPUTE_PROGRAM.compile(template);
 		}
 		else if (computeMode == ComputeMode.OPENCL)

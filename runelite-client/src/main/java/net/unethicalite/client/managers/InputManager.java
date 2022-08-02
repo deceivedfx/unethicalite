@@ -1,17 +1,12 @@
 package net.unethicalite.client.managers;
 
 import com.github.kwhat.jnativehook.GlobalScreen;
-import com.github.kwhat.jnativehook.NativeHookException;
 import com.github.kwhat.jnativehook.keyboard.NativeKeyEvent;
 import com.github.kwhat.jnativehook.keyboard.NativeKeyListener;
 import com.github.kwhat.jnativehook.mouse.NativeMouseEvent;
 import com.github.kwhat.jnativehook.mouse.NativeMouseInputListener;
 import com.github.kwhat.jnativehook.mouse.NativeMouseWheelEvent;
 import com.github.kwhat.jnativehook.mouse.NativeMouseWheelListener;
-import net.unethicalite.api.events.MouseAutomated;
-import net.unethicalite.api.events.NativeKeyInput;
-import net.unethicalite.api.events.NativeMouseInput;
-import net.unethicalite.client.config.UnethicaliteConfig;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -20,6 +15,10 @@ import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.input.MouseListener;
 import net.runelite.client.input.MouseManager;
+import net.unethicalite.api.events.MouseAutomated;
+import net.unethicalite.api.events.NativeKeyInput;
+import net.unethicalite.api.events.NativeMouseInput;
+import net.unethicalite.client.config.UnethicaliteConfig;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -54,7 +53,7 @@ public class InputManager implements MouseListener, NativeMouseInputListener, Na
 			EventBus eventBus,
 			Client client,
 			UnethicaliteConfig interactionConfig
-	) throws NativeHookException
+	)
 	{
 		this.minimalPluginManager = minimalPluginManager;
 		this.loopedPluginManager = loopedPluginManager;
@@ -64,7 +63,14 @@ public class InputManager implements MouseListener, NativeMouseInputListener, Na
 		manager.registerMouseListener(this);
 		if (!Boolean.parseBoolean(System.getenv("disablenative")))
 		{
-			GlobalScreen.registerNativeHook();
+			try
+			{
+				GlobalScreen.registerNativeHook();
+			}
+			catch (Exception e)
+			{
+				log.error("Failed to register native hook", e);
+			}
 		}
 		Logger.getLogger(GlobalScreen.class.getPackage().getName()).setLevel(java.util.logging.Level.OFF);
 	}

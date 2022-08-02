@@ -14,11 +14,19 @@ import net.runelite.client.input.KeyManager;
 import net.runelite.client.plugins.PluginManager;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.unethicalite.api.movement.pathfinder.CollisionMap;
 import net.unethicalite.api.movement.pathfinder.GlobalCollisionMap;
 import net.unethicalite.api.script.paint.Paint;
 import net.unethicalite.client.config.UnethicaliteConfig;
 import net.unethicalite.client.devtools.EntityRenderer;
-import net.unethicalite.client.managers.*;
+import net.unethicalite.client.managers.DefinitionManager;
+import net.unethicalite.client.managers.InventoryManager;
+import net.unethicalite.client.managers.NativeInputManager;
+import net.unethicalite.client.managers.NeverLogManager;
+import net.unethicalite.client.managers.PluginRepoManager;
+import net.unethicalite.client.managers.QuestManager;
+import net.unethicalite.client.managers.RegionManager;
+import net.unethicalite.client.managers.SettingsManager;
 import net.unethicalite.client.managers.interaction.InteractionManager;
 
 import javax.inject.Inject;
@@ -63,7 +71,6 @@ public class Static
 	private static ServerPacket serverPacket;
 
 	@Inject
-	@Getter
 	private static GlobalCollisionMap globalCollisionMap;
 
 	@Inject
@@ -126,8 +133,20 @@ public class Static
 	@Getter
 	private static QuestManager questManager;
 
+	@Inject
+	@Getter
+	private static PluginRepoManager pluginRepoManager;
+
+	@Inject
+	private static SettingsManager settingsManager;
+
 	public static void setScriptArgs(String[] scriptArgs)
 	{
 		Static.scriptArgs = scriptArgs;
+	}
+
+	public static CollisionMap getGlobalCollisionMap()
+	{
+		return getClient().isInInstancedRegion() ? globalCollisionMap.withLocalCollisions() : globalCollisionMap;
 	}
 }
