@@ -1,42 +1,32 @@
 package net.unethicalite.client.managers;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.CollisionData;
 import net.runelite.api.CollisionDataFlag;
-import net.runelite.api.GameState;
 import net.runelite.api.InventoryID;
 import net.runelite.api.Tile;
 import net.runelite.api.coords.Direction;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.ItemContainerChanged;
+import net.runelite.api.events.VarbitChanged;
 import net.runelite.api.events.WidgetLoaded;
 import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.unethicalite.regions.TileFlag;
-import net.unethicalite.api.entities.Players;
 import net.unethicalite.api.game.Game;
 import net.unethicalite.api.movement.Reachable;
 import net.unethicalite.api.movement.pathfinder.TeleportLoader;
 import net.unethicalite.api.movement.pathfinder.TransportLoader;
 import net.unethicalite.api.movement.pathfinder.Walker;
-import net.unethicalite.api.movement.pathfinder.model.poh.JewelryBox;
 import net.unethicalite.api.movement.pathfinder.model.Transport;
+import net.unethicalite.api.movement.pathfinder.model.poh.JewelryBox;
 import net.unethicalite.api.scene.Tiles;
 import net.unethicalite.client.Static;
 import net.unethicalite.client.config.UnethicaliteConfig;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
-import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,12 +35,10 @@ import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+@Slf4j
 @Singleton
 public class RegionManager
 {
-	public static final MediaType JSON_MEDIATYPE = MediaType.parse("application/json");
-	public static final Gson GSON = new GsonBuilder().create();
-	private static final Logger logger = LoggerFactory.getLogger(RegionManager.class);
 	private static final Set<Integer> REFRESH_WIDGET_IDS = Set.of(
 			WidgetInfo.QUEST_COMPLETED_NAME_TEXT.getGroupId(),
 			WidgetInfo.LEVEL_UP_LEVEL.getGroupId()
@@ -68,22 +56,21 @@ public class RegionManager
 	);
 
 	private static final Set<Integer> REFRESH_VARBS = Set.of(
-
+			// Static
+			4504,
+			4536,
+			4525,
+			10449,
+			10450,
+			// Hardcoded
+			3637,
+			4897,
+			8063
 	);
 
-	private static final Set<Integer> REFRESH_VARPS = Set.of(
+	private static boolean REFRESH_PATH = false;
+	private static boolean INITIAL_LOGIN = true;
 
-	);
-
-	private static boolean INVENTORY_CHANGED = false;
-	private static boolean EQUIPMENT_CHANGED = false;
-	private static boolean SKILLS_CHANGED = false;
-	private static boolean CONFIG_CHANGED = false;
-	@Inject
-	@Named("unethicalite.api.url")
-	private String apiUrl;
-	@Inject
-	private OkHttpClient okHttpClient;
 	@Inject
 	private ScheduledExecutorService executorService;
 
@@ -94,11 +81,8 @@ public class RegionManager
 
 	public static boolean shouldRefreshPath()
 	{
-		boolean refreshPath = INVENTORY_CHANGED || EQUIPMENT_CHANGED || CONFIG_CHANGED || SKILLS_CHANGED;
-		EQUIPMENT_CHANGED = false;
-		INVENTORY_CHANGED = false;
-		SKILLS_CHANGED = false;
-		CONFIG_CHANGED = false;
+		boolean refreshPath = REFRESH_PATH;
+		REFRESH_PATH = false;
 		return refreshPath;
 	}
 
@@ -139,83 +123,29 @@ public class RegionManager
 		Static.getEventBus().register(this);
 	}
 
-	public void sendRegion()
-	{
-		if (Game.getState() != GameState.LOGGED_IN || !Static.getUnethicaliteConfig().regions())
-		{
-			return;
-		}
-
-		if (Static.getClient().isInInstancedRegion())
-		{
-			executorService.schedule(() ->
-			{
-				Request request = new Request.Builder()
-						.get()
-						.url(apiUrl + "/regions/instance/" + Players.getLocal().getWorldLocation().getRegionID())
-						.build();
-
-				try (Response response = okHttpClient.newCall(request)
-						.execute())
-				{
-					int code = response.code();
-					if (code != 200)
-					{
-						logger.error("Instance store request was unsuccessful: {}", code);
-						return;
-					}
-
-					logger.debug("Instanced region stored successfully");
-				}
-				catch (Exception e)
-				{
-					logger.error("Failed to POST: {}", e.getMessage());
-					e.printStackTrace();
-				}
-			}, 5_000, TimeUnit.MILLISECONDS);
-
-			return;
-		}
-
-		executorService.schedule(() ->
-		{
-			String json = GSON.toJson(getTileFlags());
-			RequestBody body = RequestBody.create(JSON_MEDIATYPE, json);
-			Request request = new Request.Builder()
-					.post(body)
-					.url(apiUrl + "/regions")
-					.build();
-			try (Response response = okHttpClient.newCall(request)
-					.execute())
-			{
-				int code = response.code();
-				if (code != 200)
-				{
-					logger.error("Request was unsuccessful: {}", code);
-					return;
-				}
-
-				logger.debug("Region saved successfully");
-			}
-			catch (Exception e)
-			{
-				logger.error("Failed to POST: {}", e.getMessage());
-				e.printStackTrace();
-			}
-		}, 5, TimeUnit.SECONDS);
-	}
-
 	@Subscribe(priority = Integer.MAX_VALUE)
 	public void onGameStateChanged(GameStateChanged event)
 	{
-		// Force a refresh ~1 second after logging in so that everything has loaded.
-		if (event.getGameState() == GameState.LOGGED_IN)
+		switch (event.getGameState())
 		{
-			executorService.schedule(() -> {
-				INVENTORY_CHANGED = true;
-				TeleportLoader.refreshTeleports();
-				TransportLoader.refreshTransports();
-			}, 1000, TimeUnit.MILLISECONDS);
+			case UNKNOWN:
+			case STARTING:
+			case LOGIN_SCREEN:
+			case LOGIN_SCREEN_AUTHENTICATOR:
+			case CONNECTION_LOST:
+				INITIAL_LOGIN = true;
+				break;
+			case LOGGED_IN:
+				if (INITIAL_LOGIN)
+				{
+					INITIAL_LOGIN = false;
+					executorService.schedule(() ->
+					{
+						REFRESH_PATH = true;
+						TeleportLoader.refreshTeleports();
+						TransportLoader.refreshTransports();
+					}, 1000, TimeUnit.MILLISECONDS);
+				}
 		}
 	}
 
@@ -234,9 +164,20 @@ public class RegionManager
 	{
 		if (REFRESH_WIDGET_IDS.contains(event.getGroupId()))
 		{
-			SKILLS_CHANGED = true;
+			REFRESH_PATH = true;
 			TransportLoader.refreshTransports();
 			TeleportLoader.refreshTeleports();
+		}
+	}
+
+	@Subscribe(priority = Integer.MAX_VALUE)
+	public void onVarChanged(VarbitChanged event)
+	{
+		if (REFRESH_VARBS.contains(event.getIndex()))
+		{
+			REFRESH_PATH = true;
+			TeleportLoader.refreshTeleports();
+			TransportLoader.refreshTransports();
 		}
 	}
 
@@ -245,13 +186,13 @@ public class RegionManager
 	{
 		if (event.getContainerId() == InventoryID.INVENTORY.getId())
 		{
-			INVENTORY_CHANGED = true;
+			REFRESH_PATH = true;
 			TransportLoader.refreshTransports();
 			TeleportLoader.refreshTeleports();
 		}
 		if (event.getContainerId() == InventoryID.EQUIPMENT.getId())
 		{
-			EQUIPMENT_CHANGED = true;
+			REFRESH_PATH = true;
 			TransportLoader.refreshTransports();
 			TeleportLoader.refreshTeleports();
 		}
@@ -266,7 +207,7 @@ public class RegionManager
 		}
 		if (pathfinderConfigKeys.contains(event.getKey()))
 		{
-			CONFIG_CHANGED = true;
+			REFRESH_PATH = true;
 			if (Game.isLoggedIn())
 			{
 				TransportLoader.refreshTransports();

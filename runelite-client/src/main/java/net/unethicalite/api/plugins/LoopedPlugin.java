@@ -7,6 +7,7 @@ import net.runelite.client.plugins.Plugin;
 import net.unethicalite.api.commons.Time;
 import net.unethicalite.api.game.Game;
 
+import javax.swing.SwingUtilities;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -58,12 +59,6 @@ public abstract class LoopedPlugin extends Plugin implements Runnable
 		{
 			try
 			{
-				if (nextSleep == -1000)
-				{
-					stop();
-					return;
-				}
-
 				int currentTick = ticks.get();
 				if (sleepUntil > 0 && sleepUntil > currentTick && Game.isLoggedIn())
 				{
@@ -74,6 +69,10 @@ public abstract class LoopedPlugin extends Plugin implements Runnable
 
 				currentSleep = this instanceof Script ? ((Script) this).outerLoop() : loop();
 			}
+			catch (PluginStoppedException e)
+			{
+				SwingUtilities.invokeLater(() -> Plugins.stopPlugin(this));
+			}
 			finally
 			{
 				if (sleepUntil == 0)
@@ -82,6 +81,7 @@ public abstract class LoopedPlugin extends Plugin implements Runnable
 					{
 						int currentTick = ticks.get();
 						sleepUntil = currentTick + Math.abs(currentSleep);
+						nextSleep = 0;
 					}
 					else
 					{
