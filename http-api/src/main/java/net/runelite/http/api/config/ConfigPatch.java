@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2018, Lars <lars.oernlo@gmail.com>
+ * Copyright (c) 2022, Adam <Adam@sigterm.info>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,11 +22,18 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package net.runelite.client.plugins.runepouch.config;
+package net.runelite.http.api.config;
 
-public enum RunePouchOverlayMode
+import lombok.Data;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+@Data
+public class ConfigPatch
 {
-	INVENTORY,
-	MOUSE_HOVER,
-	BOTH
+	Map<String, String> edit = new HashMap<>();
+	Set<String> unset = new HashSet<>();
 }

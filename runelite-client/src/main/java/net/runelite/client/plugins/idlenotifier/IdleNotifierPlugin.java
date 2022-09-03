@@ -405,9 +405,7 @@ public class IdleNotifierPlugin extends Plugin
 		}
 
 		final Hitsplat hitsplat = event.getHitsplat();
-
-		if (hitsplat.getHitsplatType() == Hitsplat.HitsplatType.DAMAGE_ME
-			|| hitsplat.getHitsplatType() == Hitsplat.HitsplatType.BLOCK_ME)
+		if (hitsplat.isMine())
 		{
 			lastCombatCountdown = HIGHEST_MONSTER_ATTACK_SPEED;
 		}
@@ -511,7 +509,7 @@ public class IdleNotifierPlugin extends Plugin
 
 	private boolean checkFullSpecEnergy()
 	{
-		int currentSpecEnergy = client.getVar(VarPlayer.SPECIAL_ATTACK_PERCENT);
+		int currentSpecEnergy = client.getVarpValue(VarPlayer.SPECIAL_ATTACK_PERCENT);
 
 		int threshold = config.getSpecEnergyThreshold() * 10;
 		if (threshold == 0)

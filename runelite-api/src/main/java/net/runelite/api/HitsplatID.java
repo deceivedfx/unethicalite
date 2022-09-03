@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Weird Gloop <admin@weirdgloop.org>
+ * Copyright (c) 2022, Adam <Adam@sigterm.info>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,27 +22,29 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package net.runelite.api;
 
-package net.runelite.client.plugins.crowdsourcing.movement;
-
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import net.runelite.api.MenuAction;
-import net.runelite.api.coords.WorldPoint;
-
-@Data
-@AllArgsConstructor
-public class MovementData
+public final class HitsplatID
 {
-	private final WorldPoint start;
-	private final WorldPoint end;
-	private final boolean fromInstance;
-	private final boolean toInstance;
-	private final int ticks;
-	private MenuAction menuAction;
-	private int menuIdentifier;
-	private String menuOption;
-	private String menuTarget;
-	private int param0;
-	private int param1;
+	public static final int BLOCK_ME = 12;
+	public static final int BLOCK_OTHER = 13;
+	public static final int DAMAGE_ME = 16;
+	public static final int DAMAGE_OTHER = 17;
+	public static final int POISON = 2;
+	public static final int DISEASE = 4;
+	public static final int VENOM = 5;
+	public static final int HEAL = 6;
+	public static final int DAMAGE_ME_CYAN = 18;
+	public static final int DAMAGE_OTHER_CYAN = 19;
+	public static final int DAMAGE_ME_ORANGE = 20;
+	public static final int DAMAGE_OTHER_ORANGE = 21;
+	public static final int DAMAGE_ME_YELLOW = 22;
+	public static final int DAMAGE_OTHER_YELLOW = 23;
+	public static final int DAMAGE_ME_WHITE = 24;
+	public static final int DAMAGE_OTHER_WHITE = 25;
+	public static final int DAMAGE_MAX_ME = 43;
+	public static final int DAMAGE_MAX_ME_CYAN = 44;
+	public static final int DAMAGE_MAX_ME_ORANGE = 45;
+	public static final int DAMAGE_MAX_ME_YELLOW = 46;
+	public static final int DAMAGE_MAX_ME_WHITE = 47;
 }
